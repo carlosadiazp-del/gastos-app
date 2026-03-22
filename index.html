@@ -246,6 +246,28 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);font-size:15px
 /* ── REPORTES ── */
 .rep-wrap{width:100%;padding:14px 16px;}
 .rep-period{display:flex;gap:8px;margin-bottom:16px;overflow-x:auto;padding-bottom:4px;}
+
+/* Category report */
+.cat-section{margin-bottom:20px;}
+.cat-title{font-family:var(--fd);font-size:.9rem;font-weight:700;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;padding:0 2px;}
+.cat-bar-wrap{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);
+  padding:14px;margin-bottom:8px;}
+.cat-bar-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.cat-bar-name{font-size:.88rem;font-weight:500;}
+.cat-bar-amt{font-family:var(--fd);font-size:.92rem;font-weight:700;}
+.cat-bar-track{height:6px;background:var(--s3);border-radius:3px;overflow:hidden;}
+.cat-bar-fill{height:100%;border-radius:3px;transition:width .4s;}
+.cat-bar-sub{display:flex;justify-content:space-between;margin-top:5px;}
+.cat-bar-bs{font-size:.72rem;color:var(--muted);}
+.cat-bar-pct{font-size:.72rem;color:var(--muted);}
+.cat-filter-row{display:flex;gap:8px;margin-bottom:14px;}
+.cat-filter-btn{padding:6px 14px;border-radius:20px;border:1.5px solid var(--border);
+  background:none;color:var(--muted);font-size:.78rem;cursor:pointer;font-family:var(--ff);}
+.cat-filter-btn.on{border-color:var(--ac);color:var(--ac);background:rgba(240,192,64,.08);}
+.cat-filter-btn.on-ing{border-color:var(--income);color:var(--income);background:rgba(94,196,160,.08);}
+.cat-filter-btn.on-gas{border-color:var(--expense);color:var(--expense);background:rgba(224,96,96,.08);}
+.cat-empty{text-align:center;color:var(--muted);font-size:.88rem;padding:24px 0;font-style:italic;}
 .rptab{flex-shrink:0;padding:8px 18px;border-radius:20px;border:1.5px solid var(--border);
   background:none;color:var(--muted);font-size:.8rem;cursor:pointer;font-family:var(--ff);}
 .rptab.on{border-color:var(--ac);color:var(--ac);background:rgba(240,192,64,.08);}
@@ -527,6 +549,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--ff);font-size:15px
         <button class="rptab on" id="rp-hoy"   onclick="setRep('hoy')">Hoy</button>
         <button class="rptab"    id="rp-mes"    onclick="setRep('mes')">Este Mes</button>
         <button class="rptab"    id="rp-hist"   onclick="setRep('hist')">Histórico</button>
+        <button class="rptab"    id="rp-cat"    onclick="setRep('cat')">📊 Categorías</button>
       </div>
 
       <!-- Month navigator (hidden for 'hoy') -->
@@ -1006,7 +1029,7 @@ function renderList() {
 // ═══════════════════════════════════════════════════════════════════════
 function setRep(r) {
   curRep=r;
-  ['hoy','mes','hist'].forEach(x=>document.getElementById('rp-'+x).classList.toggle('on',x===r));
+  ['hoy','mes','hist','cat'].forEach(x=>document.getElementById('rp-'+x).classList.toggle('on',x===r));
   document.getElementById('month-nav').style.display=(r==='mes'||r==='hist')?'flex':'none';
   renderReport();
 }
@@ -1031,9 +1054,13 @@ function renderReport() {
     const mm=movs.filter(m=>m.fecha&&m.fecha.startsWith(ym));
     el.innerHTML=buildBalCard(mm,'Mes: '+fmtMonth(repMonth))+buildUserCards(mm)+buildDayGroups(mm);
   }
-  else { // hist
+  else if(curRep==='hist') {
     document.getElementById('month-label').textContent='Todo el historial';
     el.innerHTML=buildBalCard(movs,'Historial completo')+buildMonthGroups()+buildUserCards(movs);
+  }
+  else if(curRep==='cat') {
+    document.getElementById('month-label').textContent='Por categoría';
+    el.innerHTML=buildCatReport();
   }
 }
 
@@ -1165,6 +1192,112 @@ function buildMonthGroups() {
     </div>`;
   }).join('');
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// CATEGORY REPORT
+// ═══════════════════════════════════════════════════════════════════════
+let curCatFilter = 'all'; // 'all', 'ing', 'gas'
+let curCatUser   = 'all'; // 'all', 'u0', 'u1'
+let curCatPeriod = 'mes'; // 'mes', 'total'
+
+function buildCatReport() {
+  const now = new Date();
+  const ym  = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+
+  // Filter buttons HTML
+  const filterBtns = `
+    <div style="margin-bottom:10px">
+      <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Período</div>
+      <div class="cat-filter-row" id="cat-period-row">
+        <button class="cat-filter-btn ${curCatPeriod==='mes'?'on':''}" onclick="setCatPeriod('mes')">Este Mes</button>
+        <button class="cat-filter-btn ${curCatPeriod==='total'?'on':''}" onclick="setCatPeriod('total')">Todo</button>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Tipo</div>
+      <div class="cat-filter-row">
+        <button class="cat-filter-btn ${curCatFilter==='all'?'on':''}" onclick="setCatFilter('all')">Todos</button>
+        <button class="cat-filter-btn ${curCatFilter==='gas'?'on-gas':''}" onclick="setCatFilter('gas')">↓ Gastos</button>
+        <button class="cat-filter-btn ${curCatFilter==='ing'?'on-ing':''}" onclick="setCatFilter('ing')">↑ Ingresos</button>
+      </div>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:.7rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:8px">Usuario</div>
+      <div class="cat-filter-row">
+        <button class="cat-filter-btn ${curCatUser==='all'?'on':''}" onclick="setCatUser('all')">Todos</button>
+        <button class="cat-filter-btn ${curCatUser==='u0'?'on':''}" onclick="setCatUser('u0')">${esc(CFG.users[0])}</button>
+        <button class="cat-filter-btn ${curCatUser==='u1'?'on':''}" onclick="setCatUser('u1')">${esc(CFG.users[1])}</button>
+      </div>
+    </div>`;
+
+  // Apply filters
+  let data = movs;
+  if (curCatPeriod === 'mes') data = data.filter(m=>m.fecha&&m.fecha.startsWith(ym));
+  if (curCatFilter !== 'all') data = data.filter(m=>m.tipo===curCatFilter);
+  if (curCatUser   !== 'all') data = data.filter(m=>m.usuario===curCatUser);
+
+  if (!data.length) return filterBtns + '<div class="cat-empty">Sin movimientos para mostrar.</div>';
+
+  // Group by category
+  const byCat = {};
+  data.forEach(m => {
+    const cat = m.categoria || 'Otros';
+    if (!byCat[cat]) byCat[cat] = {usd:0, bs:0, count:0, tipo: m.tipo};
+    byCat[cat].usd   += (+m.usd||0);
+    byCat[cat].bs    += (+m.bs||0);
+    byCat[cat].count += 1;
+    // Mixed tipo
+    if (byCat[cat].tipo !== m.tipo) byCat[cat].tipo = 'mix';
+  });
+
+  const totalUsd = Object.values(byCat).reduce((s,c)=>s+c.usd, 0);
+  const sorted   = Object.entries(byCat).sort((a,b)=>b[1].usd-a[1].usd);
+
+  // Separate by tipo for sections
+  const gasEntries = sorted.filter(([,v])=>v.tipo==='gas'||v.tipo==='mix');
+  const ingEntries = sorted.filter(([,v])=>v.tipo==='ing');
+
+  const buildSection = (entries, color, label) => {
+    if (!entries.length) return '';
+    const secTotal = entries.reduce((s,[,v])=>s+v.usd,0);
+    const bars = entries.map(([cat, val]) => {
+      const pct = secTotal > 0 ? Math.round((val.usd/secTotal)*100) : 0;
+      return `
+        <div class="cat-bar-wrap">
+          <div class="cat-bar-top">
+            <div class="cat-bar-name">${esc(cat)}</div>
+            <div class="cat-bar-amt" style="color:${color}">${fU(val.usd)}</div>
+          </div>
+          <div class="cat-bar-track">
+            <div class="cat-bar-fill" style="width:${pct}%;background:${color}"></div>
+          </div>
+          <div class="cat-bar-sub">
+            <span class="cat-bar-bs">${fB(val.bs)} · ${val.count} mov.</span>
+            <span class="cat-bar-pct">${pct}%</span>
+          </div>
+        </div>`;
+    }).join('');
+    return `<div class="cat-section">
+      <div class="cat-title">${label} — ${fU(secTotal)}</div>
+      ${bars}
+    </div>`;
+  };
+
+  const gasSection = buildSection(
+    curCatFilter==='ing' ? [] : gasEntries,
+    'var(--expense)', '↓ Gastos por categoría'
+  );
+  const ingSection = buildSection(
+    curCatFilter==='gas' ? [] : ingEntries,
+    'var(--income)', '↑ Ingresos por categoría'
+  );
+
+  return filterBtns + gasSection + ingSection;
+}
+
+function setCatFilter(f){ curCatFilter=f; renderReport(); }
+function setCatUser(u)  { curCatUser=u;   renderReport(); }
+function setCatPeriod(p){ curCatPeriod=p; renderReport(); }
 
 // ═══════════════════════════════════════════════════════════════════════
 // UTILS
